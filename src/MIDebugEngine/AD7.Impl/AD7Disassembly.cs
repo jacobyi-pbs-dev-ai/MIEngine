@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Text;
 using Microsoft.VisualStudio.Debugger.Interop;
 using System.Linq;
+using System.Diagnostics;
 
 namespace Microsoft.MIDebugEngine
 {
@@ -13,6 +14,8 @@ namespace Microsoft.MIDebugEngine
     {
         private AD7Engine _engine;
         private ulong _addr;
+        private ulong _instructionReference;
+        private long _instructionOffset;
         private enum_DISASSEMBLY_STREAM_SCOPE _scope;
 
         internal AD7DisassemblyStream(AD7Engine engine, enum_DISASSEMBLY_STREAM_SCOPE scope, IDebugCodeContext2 pCodeContext)
@@ -21,6 +24,8 @@ namespace Microsoft.MIDebugEngine
             _scope = scope;
             AD7MemoryAddress addr = pCodeContext as AD7MemoryAddress;
             _addr = addr.Address;
+            _instructionReference = _addr;
+            _instructionOffset = 0;
         }
 
         #region IDebugDisassemblyStream2 Members
@@ -122,6 +127,19 @@ namespace Microsoft.MIDebugEngine
             for (iOp = 0; _addr < instructions.First().Addr; _addr++, iOp++)
             {
                 prgDisassembly[iOp] = FetchBadInstruction(dwFields);
+            }
+
+            // workaround to avoid vscode bug: refer to loadDisassembledInstructions() in disassemblyView.ts
+            if (_instructionOffset < 0)
+            {
+                int instructionIndex = Array.FindIndex(instructions.ToArray(), (i) => (i.Addr == _instructionReference));
+                Debug.Assert(0 <= instructionIndex);
+                // instrunction reference should be at instruction offset
+                for (int i = 0; i < (-_instructionOffset - instructionIndex); ++i, ++iOp)
+                {
+                    prgDisassembly[iOp] = FetchBadInstruction(dwFields);
+                }
+                _instructionOffset = 0;
             }
 
             foreach (DisasmInstruction instruction in instructions)
@@ -233,6 +251,7 @@ namespace Microsoft.MIDebugEngine
                 _addr = uCodeLocationId;
             }
 
+            _instructionOffset = iInstructions;
             if (iInstructions >= 0)
             {
                 return SeekForward(iInstructions);

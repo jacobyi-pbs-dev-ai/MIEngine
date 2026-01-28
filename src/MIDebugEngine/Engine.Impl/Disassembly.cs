@@ -207,7 +207,8 @@ namespace Microsoft.MIDebugEngine
                 ret = UpdateCache(address, -nInstructions, instructions);
                 if (ret == null)
                 {
-                    return defaultAddr;
+                    //return defaultAddr;
+                    return startAddress;    // why not returing min valid address?
                 }
             }
 
